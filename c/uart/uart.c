@@ -8,6 +8,7 @@
 #include <pico/time.h>
 #include <hardware/pio.h>
 #include "hardware/timer.h"
+#include <math.h>
 
 #include "quadrature_encoder.pio.h"
 
@@ -18,6 +19,7 @@
 #define UART_ID uart0
 #define BAUD_RATE 9600
 #define ARRAY_SIZE 6
+#define WHEELBASE 0.09
 
 int main() {
 
@@ -66,17 +68,28 @@ int main() {
     int new_enc_value_left, delta_left, old_enc_value_left = 0;
     int new_enc_value_right, delta_right, old_enc_value_right = 0;
 
+    uint32_t time_stamp_us_new = time_us_32();
+    uint32_t time_stamp_us_old = 0;
+
     while (1){
-        sleep_ms(100);
+        //sleep_ms(100);
+
+        time_stamp_us_old = time_stamp_us_new;
+        time_stamp_us_new = time_us_32();
 
         // Read the encoder value
         new_enc_value_left = quadrature_encoder_get_count(pio_left, sm);
         delta_left = new_enc_value_left - old_enc_value_left;
+
         old_enc_value_left = new_enc_value_left;
 
         new_enc_value_right = quadrature_encoder_get_count(pio_right, sm);
         delta_right = new_enc_value_right - old_enc_value_right;
         old_enc_value_right = new_enc_value_right;
+
+        float vel_left_enc = (float)(delta_left * 100000 / 170) / ((float)(time_stamp_us_new - time_stamp_us_old));
+        float vel_right_enc = (float)(delta_right * 100000 / 170) / ((float)(time_stamp_us_new - time_stamp_us_old));
+
 
         // Read the UART data
         while (uart_getc(UART_ID) != start_byte);
@@ -91,34 +104,23 @@ int main() {
             memcpy(&array[i], &data[i * sizeof(float) + 1], sizeof(float)); // Offset by 1 for start byte
         }
 
+        float forward_velocity = array[4];
+        float  rotational_velocity = -1.0 * array[5]* (M_PI / 180.0);
+
         // Control the motors
         float left_speed = 0;
         float right_speed = 0;
+        float v_left_ref = forward_velocity - (rotational_velocity * WHEELBASE / 2);
+        float v_right_ref = forward_velocity + (rotational_velocity * WHEELBASE / 2);
 
-        if (array[4] > degrees_max) {
-            left_speed = speed;
-            right_speed = speed;
-        } else if(array[4] < -degrees_max){
-            left_speed = -speed;
-            right_speed = -speed;
-        }else
-        {
-            left_speed = 0;
-            right_speed = 0;
-        }
+        float error_left = v_left_ref - vel_left_enc;
+        float error_right = v_right_ref - vel_right_enc;
 
-        if (array[5] > degrees_max) {
-            left_speed += speed/3;
-            right_speed -= speed/3;
-        } else if(array[5] < -degrees_max){
-            left_speed -= speed/3;
-            right_speed += speed/3;
-        }else
-        {
-            // Nothing happens
-        }
+        left_speed = error_left * 1000;
+        right_speed = error_right * 1000;
 
-        // motors_set_speeds(left_speed, right_speed);
+
+        //motors_set_speeds(left_speed, right_speed);
 
         // Fill strings for display
         char str1[64];
@@ -126,7 +128,7 @@ int main() {
         char str3[64];
         char empty[64];
         sprintf(str1, "%.1f %.1f %.1f", array[0], array[1], array[2]);
-        sprintf(str2, "%.1f %.1d %.1d", array[3], new_enc_value_left, new_enc_value_right);
+        sprintf(str2, "%.1f %.1f %.1f", array[3], error_left, error_right);
         sprintf(str3, "%.1f  %.1f", array[4], array[5]);
         display_fill_rect(0, 16, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);
         display_fill_rect(0, 32, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);

@@ -20,6 +20,9 @@
 #define BAUD_RATE 9600
 #define ARRAY_SIZE 6
 #define WHEELBASE 0.09
+#define ENCODER_ONEROUND 170
+#define KP_FORWARD 1500.0
+#define KP_ROTATIONAL 1.0
 
 int main() {
 
@@ -71,8 +74,7 @@ int main() {
     uint32_t time_stamp_us_new = time_us_32();
     uint32_t time_stamp_us_old = 0;
 
-    // Gains
-    float p_gain = 1500.0;
+
 
     while (1){
 
@@ -89,8 +91,8 @@ int main() {
         delta_right = new_enc_value_right - old_enc_value_right;
         old_enc_value_right = new_enc_value_right;
 
-        float vel_left_enc = (float)(delta_left * 100000 / 170) / ((float)(time_stamp_us_new - time_stamp_us_old));
-        float vel_right_enc = (float)(delta_right * 100000 / 170) / ((float)(time_stamp_us_new - time_stamp_us_old));
+        float vel_left_enc = (float)(delta_left * 100000 / ENCODER_ONEROUND) / ((float)(time_stamp_us_new - time_stamp_us_old));
+        float vel_right_enc = (float)(delta_right * 100000 / ENCODER_ONEROUND) / ((float)(time_stamp_us_new - time_stamp_us_old));
 
 
         // Read the UART data
@@ -119,8 +121,8 @@ int main() {
         float error_right = v_right_ref - vel_right_enc;
 
 
-        int32_t pwm_left = (int32_t)(v_left_ref * p_gain);
-        int32_t pwm_right = (int32_t)(v_right_ref * 1500.0);
+        int32_t pwm_left = (int32_t)(v_left_ref * KP_FORWARD);
+        int32_t pwm_right = (int32_t)(v_right_ref * KP_FORWARD);
 
         motors_set_speeds(pwm_left, pwm_right);
 
@@ -131,7 +133,7 @@ int main() {
         char empty[64];
         sprintf(str1, "X,Y,Z: %.1f %.1f %.1f", array[0], array[1], array[2]);
         sprintf(str2, "Yaw: %.1f", array[3]);
-        sprintf(str3, "Cmds: %.1f  %.1f", array[4], array[5]);
+        sprintf(str3, "Cmds: %.1f  %.1f", forward_velocity, rotational_velocity);
         display_fill_rect(0, 16, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);
         display_fill_rect(0, 32, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);
         display_fill_rect(0, 48, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);

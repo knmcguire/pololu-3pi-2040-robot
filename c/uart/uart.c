@@ -71,8 +71,10 @@ int main() {
     uint32_t time_stamp_us_new = time_us_32();
     uint32_t time_stamp_us_old = 0;
 
+    // Gains
+    float p_gain = 1500.0;
+
     while (1){
-        //sleep_ms(100);
 
         time_stamp_us_old = time_stamp_us_new;
         time_stamp_us_new = time_us_32();
@@ -108,28 +110,28 @@ int main() {
         float  rotational_velocity = -1.0 * array[5]* (M_PI / 180.0);
 
         // Control the motors
-        float left_speed = 0;
-        float right_speed = 0;
+        uint32_t left_speed = 0;
+        uint32_t right_speed = 0;
         float v_left_ref = forward_velocity - (rotational_velocity * WHEELBASE / 2);
         float v_right_ref = forward_velocity + (rotational_velocity * WHEELBASE / 2);
 
         float error_left = v_left_ref - vel_left_enc;
         float error_right = v_right_ref - vel_right_enc;
 
-        left_speed = error_left * 1000;
-        right_speed = error_right * 1000;
 
+        int32_t pwm_left = (int32_t)(v_left_ref * p_gain);
+        int32_t pwm_right = (int32_t)(v_right_ref * 1500.0);
 
-        //motors_set_speeds(left_speed, right_speed);
+        motors_set_speeds(pwm_left, pwm_right);
 
         // Fill strings for display
         char str1[64];
         char str2[64];
         char str3[64];
         char empty[64];
-        sprintf(str1, "%.1f %.1f %.1f", array[0], array[1], array[2]);
-        sprintf(str2, "%.1f %.1f %.1f", array[3], error_left, error_right);
-        sprintf(str3, "%.1f  %.1f", array[4], array[5]);
+        sprintf(str1, "X,Y,Z: %.1f %.1f %.1f", array[0], array[1], array[2]);
+        sprintf(str2, "Yaw: %.1f", array[3]);
+        sprintf(str3, "Cmds: %.1f  %.1f", array[4], array[5]);
         display_fill_rect(0, 16, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);
         display_fill_rect(0, 32, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);
         display_fill_rect(0, 48, DISPLAY_WIDTH, 16, 0 | DISPLAY_NOW);
